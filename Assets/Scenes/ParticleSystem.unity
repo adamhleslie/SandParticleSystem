@@ -150,8 +150,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   particlePrefab: {fileID: 1663848538987322, guid: 1f6f9e543e9b7754ea5b827d3dc8d087,
     type: 2}
-  initialParticles: 10
-  timeToLive: 5
+  initialParticles: 15000
+  timeToLive: 20
+  xRange: {x: -1, y: 1}
+  yRange: {x: -1, y: 1}
+  zRange: {x: -1, y: 1}
+  xVelRange: {x: -0.5, y: 0.5}
+  yVelRange: {x: -0.5, y: 0.5}
+  zVelRange: {x: -0.5, y: 0.5}
 --- !u!1 &836738442
 GameObject:
   m_ObjectHideFlags: 0
