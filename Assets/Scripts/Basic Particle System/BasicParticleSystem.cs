@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SandParticleSystem : MonoBehaviour
+public class BasicParticleSystem : MonoBehaviour
 {
-
-
-
+    
 }
