@@ -15,6 +15,7 @@ public class VerletParticleSystem : MonoBehaviour
 
     private List<VerletParticle> particles;
     private bool paused = false;
+    private Mesh mesh;
 
     private void Start ()
     {
@@ -35,13 +36,14 @@ public class VerletParticleSystem : MonoBehaviour
         }
     }
 
-    private void GenerateParticles()
+    private void GenerateParticles ()
     {
         SimpleParticle[] simpleParticles = spawner.GenerateParticles(initialParticles);
         for (int i = 0; i < initialParticles; i++)
         {
             SimpleParticle simpleParticle = simpleParticles[i];
-            GameObject go = Instantiate(particlePrefab, simpleParticle.position, Quaternion.identity);
+            GameObject go = new GameObject("Particle " + i);
+            go.transform.SetPositionAndRotation(simpleParticle.position, Quaternion.identity);
 
             // Add Verlet Specific Behavior
             VerletParticle particle = go.GetOrAddComponent<VerletParticle>();
@@ -50,13 +52,26 @@ public class VerletParticleSystem : MonoBehaviour
 
             particles.Add(particle);
         }
+
+        // Set up for rendering particles
+        Vector3[] vertices = new Vector3[initialParticles];
+        int[] indices = new int[initialParticles];
+        for (int i = 0; i < initialParticles; i++)
+        {
+            vertices[i] = simpleParticles[i].position;
+            indices[i] = i;
+        }
+
+        mesh = new Mesh();
+        gameObject.GetOrAddComponent<MeshFilter>().mesh = mesh;
+        mesh.vertices = vertices;
+        mesh.SetIndices(indices, MeshTopology.Points, 0);
     }
 
     private void UpdateParticles (float t)
     {
         Vector3 verletAcceleration = acceleration * t * t;
-        //if (verletAcceleration.magnitude > .5f)
-        //    Debug.Log("werid");
+        Vector3[] vertices = mesh.vertices;
         for (int i = particles.Count - 1; i >= 0; i--)
         {
             VerletParticle particle = particles[i];
@@ -70,17 +85,11 @@ public class VerletParticleSystem : MonoBehaviour
             else
             {
                 particle.ParticleUpdate(verletAcceleration);
+                vertices[i] = particle.transform.position;
             }
         }
 
+        mesh.vertices = vertices;
         acceleration += deltaAcceleration * t;
     }
-
-    //private void RenderParticles ()
-    //{
-    //    for (int i = 0; i < particles.Count; i++)
-    //    {
-
-    //    }
-    //}
 }
