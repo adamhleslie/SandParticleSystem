@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class BasicParticleSystem : MonoBehaviour
+public class VerletParticleSystem : MonoBehaviour
 {
     public GameObject particlePrefab;
     public int initialParticles;
@@ -15,13 +15,16 @@ public class BasicParticleSystem : MonoBehaviour
     public Vector2 xVelRange;
     public Vector2 yVelRange;
     public Vector2 zVelRange;
+    [Header("Acceleration")]
+    public Vector3 acceleration;
+    public Vector3 deltaAcceleration;
 
-    private List<BasicParticle> particles;
+    private List<VerletParticle> particles;
     private bool paused = false;
 
     private void Start ()
     {
-        particles = new List<BasicParticle>(initialParticles);
+        particles = new List<VerletParticle>(initialParticles);
 
         for (int i = 0; i < initialParticles; i++)
         {
@@ -29,14 +32,14 @@ public class BasicParticleSystem : MonoBehaviour
             GameObject go = Instantiate(particlePrefab, position, Quaternion.identity);
 
             Vector3 velocity = new Vector3(Random.Range(xVelRange.x, xVelRange.y), Random.Range(yVelRange.x, yVelRange.y), Random.Range(zVelRange.x, zVelRange.y));
-            BasicParticle particle = go.GetOrAddComponent<BasicParticle>();
+            VerletParticle particle = go.GetOrAddComponent<VerletParticle>();
             particle.timeToLive = timeToLive;
-            particle.velocity = velocity;
+            particle.priorPosition = position - (velocity * Time.fixedDeltaTime);
             particles.Add(particle);
         }
     }
 
-    void Update ()
+    void FixedUpdate ()
     {
         if (Input.GetButton("Fire1"))
         {
@@ -45,7 +48,7 @@ public class BasicParticleSystem : MonoBehaviour
 
         if (!paused)
         {
-            UpdateParticles(Time.deltaTime);
+            UpdateParticles(Time.fixedDeltaTime);
         }
     }
 
@@ -56,9 +59,12 @@ public class BasicParticleSystem : MonoBehaviour
 
     private void UpdateParticles (float t)
     {
+        Vector3 verletAcceleration = acceleration * t * t;
+        //if (verletAcceleration.magnitude > .5f)
+        //    Debug.Log("werid");
         for (int i = particles.Count - 1; i >= 0; i--)
         {
-            BasicParticle particle = particles[i];
+            VerletParticle particle = particles[i];
             particle.timeToLive -= t;
 
             if (particle.timeToLive <= 0)
@@ -68,9 +74,11 @@ public class BasicParticleSystem : MonoBehaviour
             }
             else
             {
-                particle.ParticleUpdate(t);
+                particle.ParticleUpdate(verletAcceleration);
             }
         }
+
+        acceleration += deltaAcceleration * t;
     }
 
     //private void RenderParticles ()
