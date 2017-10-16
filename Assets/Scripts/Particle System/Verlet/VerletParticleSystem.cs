@@ -42,11 +42,10 @@ public class VerletParticleSystem : MonoBehaviour
         for (int i = 0; i < initialParticles; i++)
         {
             SimpleParticle simpleParticle = simpleParticles[i];
-            GameObject go = new GameObject("Particle " + i);
-            go.transform.SetPositionAndRotation(simpleParticle.position, Quaternion.identity);
 
             // Add Verlet Specific Behavior
-            VerletParticle particle = go.GetOrAddComponent<VerletParticle>();
+            VerletParticle particle = new VerletParticle();
+            particle.position = simpleParticle.position;
             particle.priorPosition = simpleParticle.position - (simpleParticle.velocity * Time.fixedDeltaTime);
             particle.timeToLive = timeToLive;
 
@@ -80,12 +79,11 @@ public class VerletParticleSystem : MonoBehaviour
             if (particle.timeToLive <= 0)
             {
                 particles.RemoveAt(i);
-                Destroy(particle.gameObject);
             }
             else
             {
                 particle.ParticleUpdate(verletAcceleration);
-                vertices[i] = particle.transform.position;
+                vertices[i] = particle.position;
             }
         }
 
