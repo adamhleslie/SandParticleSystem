@@ -4,20 +4,14 @@ using UnityEngine;
 
 public class VerletParticleSystem : MonoBehaviour
 {
-    public GameObject particlePrefab;
-    public int initialParticles;
-    public int timeToLive;
-    [Header("Initial Position")]
-    public Vector2 xRange;
-    public Vector2 yRange;
-    public Vector2 zRange;
-    [Header("Initial Velocity")]
-    public Vector2 xVelRange;
-    public Vector2 yVelRange;
-    public Vector2 zVelRange;
+    [SerializeField] private Spawner spawner;
+    [SerializeField] private GameObject particlePrefab;
+    [SerializeField] private int initialParticles;
+    [SerializeField] private int timeToLive;
+
     [Header("Acceleration")]
-    public Vector3 acceleration;
-    public Vector3 deltaAcceleration;
+    [SerializeField] private Vector3 acceleration;
+    [SerializeField] private Vector3 deltaAcceleration;
 
     private List<VerletParticle> particles;
     private bool paused = false;
@@ -25,18 +19,7 @@ public class VerletParticleSystem : MonoBehaviour
     private void Start ()
     {
         particles = new List<VerletParticle>(initialParticles);
-
-        for (int i = 0; i < initialParticles; i++)
-        {
-            Vector3 position = new Vector3(Random.Range(xRange.x, xRange.y), Random.Range(yRange.x, yRange.y), Random.Range(zRange.x, zRange.y));
-            GameObject go = Instantiate(particlePrefab, position, Quaternion.identity);
-
-            Vector3 velocity = new Vector3(Random.Range(xVelRange.x, xVelRange.y), Random.Range(yVelRange.x, yVelRange.y), Random.Range(zVelRange.x, zVelRange.y));
-            VerletParticle particle = go.GetOrAddComponent<VerletParticle>();
-            particle.timeToLive = timeToLive;
-            particle.priorPosition = position - (velocity * Time.fixedDeltaTime);
-            particles.Add(particle);
-        }
+        GenerateParticles();
     }
 
     void FixedUpdate ()
@@ -52,10 +35,22 @@ public class VerletParticleSystem : MonoBehaviour
         }
     }
 
-    //private void GenerateParticles ()
-    //{
+    private void GenerateParticles()
+    {
+        SimpleParticle[] simpleParticles = spawner.GenerateParticles(initialParticles);
+        for (int i = 0; i < initialParticles; i++)
+        {
+            SimpleParticle simpleParticle = simpleParticles[i];
+            GameObject go = Instantiate(particlePrefab, simpleParticle.position, Quaternion.identity);
 
-    //}
+            // Add Verlet Specific Behavior
+            VerletParticle particle = go.GetOrAddComponent<VerletParticle>();
+            particle.priorPosition = simpleParticle.position - (simpleParticle.velocity * Time.fixedDeltaTime);
+            particle.timeToLive = timeToLive;
+
+            particles.Add(particle);
+        }
+    }
 
     private void UpdateParticles (float t)
     {
