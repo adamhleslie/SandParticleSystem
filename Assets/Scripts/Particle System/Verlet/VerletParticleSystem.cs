@@ -4,9 +4,10 @@ using UnityEngine;
 
 public class VerletParticleSystem : MonoBehaviour
 {
-    [SerializeField] private Spawner spawner;
-    [SerializeField] private GameObject particlePrefab;
-    [SerializeField] private int initialParticles;
+    const int kMaxParticles = 65000;
+
+    [SerializeField] private Spawner[] spawners;
+    [SerializeField] private int maxParticles;
     [SerializeField] private int timeToLive;
 
     [Header("Acceleration")]
@@ -14,12 +15,26 @@ public class VerletParticleSystem : MonoBehaviour
     [SerializeField] private Vector3 deltaAcceleration;
 
     private List<VerletParticle> particles;
+    private int remainingParticles = 0;
     private bool paused = false;
     private Mesh mesh;
 
     private void Start ()
     {
-        particles = new List<VerletParticle>(initialParticles);
+        if (spawners.Length == 0)
+        {
+            Debug.LogError("VerletParticleSystem.Start: No spawners found", this);
+        }
+
+        if (maxParticles < 0 || maxParticles > kMaxParticles)
+        {
+            Debug.LogError("VerletParticleSystem.Start: maxParticles set to invalid value, " + maxParticles + ", reset to " + kMaxParticles, this);
+            maxParticles = kMaxParticles;
+        }
+
+        remainingParticles = maxParticles;
+        particles = new List<VerletParticle>(maxParticles);
+
         GenerateParticles();
     }
 
@@ -38,18 +53,29 @@ public class VerletParticleSystem : MonoBehaviour
 
     private void GenerateParticles ()
     {
-        SimpleParticle[] simpleParticles = spawner.GenerateParticles(initialParticles);
+        for (int i = 0; i < spawners.Length && remainingParticles > 0; i++)
+        {
+            SimpleParticle[] simpleParticles = spawners[i].GenerateInitialParticles();
+            if (simpleParticles != null)
+            {
+                for (int j = 0; j < remainingParticles; j++)
+                {
+                    particles.Add(new VerletParticle(simpleParticles[j]));
+                }
+                remainingParticles -= simpleParticles.Length;
+
+            }
+        }
+
         for (int i = 0; i < initialParticles; i++)
         {
             SimpleParticle simpleParticle = simpleParticles[i];
 
             // Add Verlet Specific Behavior
             VerletParticle particle = new VerletParticle();
-            particle.position = simpleParticle.position;
-            particle.priorPosition = simpleParticle.position - (simpleParticle.velocity * Time.fixedDeltaTime);
-            particle.timeToLive = timeToLive;
 
-            particles.Add(particle);
+
+            particle);
         }
 
         // Set up for rendering particles

@@ -170,7 +170,7 @@ MonoBehaviour:
   spawner: {fileID: 326461866}
   particlePrefab: {fileID: 1663848538987322, guid: 1f6f9e543e9b7754ea5b827d3dc8d087,
     type: 2}
-  initialParticles: 65000
+  initialParticles: 100
   timeToLive: 5
   acceleration: {x: 0, y: -9.8, z: 0}
   deltaAcceleration: {x: 0, y: 4.5, z: 0}

@@ -5,9 +5,16 @@ using UnityEngine;
 
 public class VerletParticle
 {
-    public float timeToLive;
     public Vector3 position;
     public Vector3 priorPosition;
+    public float timeToLive;
+
+    public VerletParticle (SimpleParticle simpleParticle)
+    {
+        position = simpleParticle.position;
+        priorPosition = simpleParticle.position - (simpleParticle.velocity * Time.fixedDeltaTime);
+        timeToLive = simpleParticle.timeToLive;
+    }
 
     public void ParticleUpdate (Vector3 verletAcceleration)
     {
@@ -15,6 +22,5 @@ public class VerletParticle
         Vector3 implicitVelocity = (currentPosition - priorPosition);
         position = currentPosition + implicitVelocity + verletAcceleration;
         priorPosition = currentPosition;
-        //Debug.Log("p: " + currentPosition + ", v: " + implicitVelocity + ", a: " + verletAcceleration);
     }
 }
