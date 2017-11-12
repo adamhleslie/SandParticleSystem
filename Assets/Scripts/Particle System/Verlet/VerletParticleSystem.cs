@@ -1,25 +1,34 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class VerletParticleSystem : MonoBehaviour
 {
     const int kMaxParticles = 65000;
+    const int kNotInUse = -1;
 
     [SerializeField] private Spawner[] spawners;
     [SerializeField] private int maxParticles;
-    [SerializeField] private int timeToLive;
 
     [Header("Acceleration")]
     [SerializeField] private Vector3 acceleration;
     [SerializeField] private Vector3 deltaAcceleration;
 
-    private List<VerletParticle> particles;
+    [Header("Verlet Particles")]
+    public Vector3[] position;
+    public Vector3[] priorPosition;
+    public float[] timeToLive;      // Particle removed if timeToLive <= 0
+
+    public int[] indexInIndices;    // Stores the index of the particle in indices, or kNotInUse if unused
+    public List<int> indices;
+    private bool indicesModified;
+
     private int remainingParticles = 0;
     private bool paused = false;
     private Mesh mesh;
 
-    private void Start ()
+    void Start ()
     {
         if (spawners.Length == 0)
         {
@@ -32,10 +41,7 @@ public class VerletParticleSystem : MonoBehaviour
             maxParticles = kMaxParticles;
         }
 
-        remainingParticles = maxParticles;
-        particles = new List<VerletParticle>(maxParticles);
-
-        GenerateParticles();
+        GenerateInitialParticles();
     }
 
     void FixedUpdate ()
@@ -51,69 +57,142 @@ public class VerletParticleSystem : MonoBehaviour
         }
     }
 
-    private void GenerateParticles ()
+    // Adds particles provided, so that remainingParticles does not become negative
+    public void AddSimpleParticles (SimpleParticle[] simpleParticles)
     {
+        if (simpleParticles != null)
+        {
+            int newParticles = Math.Min(simpleParticles.Length, remainingParticles);
+            for (int i = 0, j = 0; i < newParticles; i++)
+            {
+                j = AddSimpleParticle(simpleParticles[i], j) + 1;
+            }
+            remainingParticles -= newParticles;
+        }
+    }
+
+    // Returns the index the particle was inserted into
+    private int AddSimpleParticle (SimpleParticle simpleParticle, int i = 0)
+    {
+        while (indexInIndices[i] != kNotInUse)
+        {
+            i++;
+        }
+
+        position[i] = simpleParticle.position;
+        priorPosition[i] = simpleParticle.position - (simpleParticle.velocity * Time.fixedDeltaTime);
+        timeToLive[i] = simpleParticle.timeToLive;
+        indexInIndices[i] = indices.Count;
+        indices.Add(i);
+
+        if (!indicesModified)
+        {
+            indicesModified = true;
+        }
+
+        return i;
+    }
+
+    // Remove all particles whose timeToLive <= 0
+    //public void RemoveParticles ()
+    //{
+    //    // Iterate through the particles we know are alive (backwards for removal)
+    //    for (int i = (indices.Count - 1); i >= 0; i--)
+    //    {
+    //        int j = indices[i];
+    //        Debug.Assert(indexInIndices[j] == i);
+    //        if (timeToLive[j] <= 0)
+    //        {
+    //            RemoveParticle(i, j);
+    //        }
+    //    }
+    //}
+
+    // i = the index in indices
+    // j = the index of the actual particle
+    public void RemoveParticle (int i, int j)
+    {
+        indices.RemoveAt(i);
+        indexInIndices[j] = kNotInUse;
+
+        remainingParticles++;
+        if (!indicesModified)
+        {
+            indicesModified = true;
+        }
+    }
+
+    private void GenerateInitialParticles ()
+    {
+        // Initialize all arrays and lists to max size
+        position = new Vector3[maxParticles];
+        priorPosition = new Vector3[maxParticles];
+        timeToLive = new float[maxParticles];
+        indexInIndices = new int[maxParticles];
+        indices = new List<int>(maxParticles);
+
+        // Set default values
+        for (int i = 0; i < maxParticles; i++)
+        {
+            indexInIndices[i] = kNotInUse;
+        }
+
+        remainingParticles = maxParticles;
+
         for (int i = 0; i < spawners.Length && remainingParticles > 0; i++)
         {
             SimpleParticle[] simpleParticles = spawners[i].GenerateInitialParticles();
-            if (simpleParticles != null)
-            {
-                for (int j = 0; j < remainingParticles; j++)
-                {
-                    particles.Add(new VerletParticle(simpleParticles[j]));
-                }
-                remainingParticles -= simpleParticles.Length;
-
-            }
-        }
-
-        for (int i = 0; i < initialParticles; i++)
-        {
-            SimpleParticle simpleParticle = simpleParticles[i];
-
-            // Add Verlet Specific Behavior
-            VerletParticle particle = new VerletParticle();
-
-
-            particle);
+            AddSimpleParticles(simpleParticles);
         }
 
         // Set up for rendering particles
-        Vector3[] vertices = new Vector3[initialParticles];
-        int[] indices = new int[initialParticles];
-        for (int i = 0; i < initialParticles; i++)
-        {
-            vertices[i] = simpleParticles[i].position;
-            indices[i] = i;
-        }
-
         mesh = new Mesh();
         gameObject.GetOrAddComponent<MeshFilter>().mesh = mesh;
-        mesh.vertices = vertices;
-        mesh.SetIndices(indices, MeshTopology.Points, 0);
+        mesh.vertices = position;
+        mesh.SetIndices(indices.ToArray(), MeshTopology.Points, 0);
     }
 
     private void UpdateParticles (float t)
     {
         Vector3 verletAcceleration = acceleration * t * t;
-        Vector3[] vertices = mesh.vertices;
-        for (int i = particles.Count - 1; i >= 0; i--)
-        {
-            VerletParticle particle = particles[i];
-            particle.timeToLive -= t;
 
-            if (particle.timeToLive <= 0)
+        for (int i = (indices.Count - 1); i >= 0; i--)
+        {
+            int j = indices[i];
+            Debug.Assert(indexInIndices[j] == i);
+
+            if (timeToLive[j] <= t)
             {
-                particles.RemoveAt(i);
+                RemoveParticle(i, j);
             }
             else
             {
-                particle.ParticleUpdate(verletAcceleration);
-                vertices[i] = particle.position;
+                timeToLive[j] -= t;
+
+                ParticleUpdate(j, verletAcceleration);
             }
         }
-
-        mesh.vertices = vertices;
         acceleration += deltaAcceleration * t;
+
+        // Update mesh
+        if (indicesModified)
+        {
+            mesh.Clear();
+            mesh.vertices = position;
+            mesh.SetIndices(indices.ToArray(), MeshTopology.Points, 0);
+            indicesModified = false;
+        }
+        else
+        {
+            mesh.vertices = position;
+        }
+    }
+
+    private void ParticleUpdate (int particle, Vector3 verletAcceleration)
+    {
+        Vector3 currentPosition = position[particle];
+        Vector3 implicitVelocity = (currentPosition - priorPosition[particle]);
+        position[particle] = currentPosition + implicitVelocity + verletAcceleration;
+        priorPosition[particle] = currentPosition;
     }
 }

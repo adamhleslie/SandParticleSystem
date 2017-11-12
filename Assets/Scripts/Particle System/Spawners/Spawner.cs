@@ -31,7 +31,7 @@ public abstract class Spawner : MonoBehaviour
         return particles;
     }
 
-    public SimpleParticle[] GenerateInitialParticles ()
+    public virtual SimpleParticle[] GenerateInitialParticles ()
     {
         return null;
     }
