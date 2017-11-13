@@ -6,17 +6,22 @@ using UnityEngine;
 public class VerletParticleSystem : MonoBehaviour
 {
     const int kMaxParticles = 65000;
+    const int kParticleMass = 1;
 
     [SerializeField] private Spawner[] spawners;
     [SerializeField] private int maxParticles;
+    [SerializeField] private float particleMass;
 
-    [Header("Acceleration")]
-    [SerializeField] private Vector3 acceleration;
-    [SerializeField] private Vector3 deltaAcceleration;
+    [Header("Forces")]
+    [SerializeField] private Vector3 baseAcceleration;
+    [SerializeField] private Vector2 xRangeForce;
+    [SerializeField] private Vector2 yRangeForce;
+    [SerializeField] private Vector2 zRangeForce;
 
     [Header("Verlet Particles")]
     private Vector3[] position;
     private Vector3[] priorPosition;
+    private Vector3[] force;
     private float[] timeToLive;      // Particle removed if timeToLive <= 0
 
     private bool[] inUse;
@@ -38,6 +43,12 @@ public class VerletParticleSystem : MonoBehaviour
         {
             Debug.Log("VerletParticleSystem.Start: maxParticles set to invalid value, " + maxParticles + ", reset to " + kMaxParticles, this);
             maxParticles = kMaxParticles;
+        }
+
+        if (particleMass <= 0)
+        {
+            Debug.Log("VerletParticleSystem.Start: particleMass invalid, " + particleMass + ", reset to " + kParticleMass, this);
+            particleMass = kParticleMass;
         }
 
         GenerateInitialParticles();
@@ -80,6 +91,7 @@ public class VerletParticleSystem : MonoBehaviour
 
         position[i] = simpleParticle.position;
         priorPosition[i] = simpleParticle.position - (simpleParticle.velocity * Time.fixedDeltaTime);
+        force[i] = new Vector3(UnityEngine.Random.Range(xRangeForce.x, xRangeForce.y), UnityEngine.Random.Range(yRangeForce.x, yRangeForce.y), UnityEngine.Random.Range(zRangeForce.x, zRangeForce.y));
         timeToLive[i] = simpleParticle.timeToLive;
         inUse[i] = true;
         indices.Add(i);
@@ -111,6 +123,7 @@ public class VerletParticleSystem : MonoBehaviour
         // Initialize all arrays and lists to max size
         position = new Vector3[maxParticles];
         priorPosition = new Vector3[maxParticles];
+        force = new Vector3[maxParticles];
         timeToLive = new float[maxParticles];
         inUse = new bool[maxParticles];
         indices = new List<int>(maxParticles);
@@ -131,7 +144,7 @@ public class VerletParticleSystem : MonoBehaviour
 
     private void UpdateParticles (float t)
     {
-        Vector3 verletAcceleration = acceleration * t * t;
+        float tSquared = t * t;
 
         for (int i = 0; i < spawners.Length; i++)
         {
@@ -153,11 +166,9 @@ public class VerletParticleSystem : MonoBehaviour
             else
             {
                 timeToLive[j] -= t;
-
-                ParticleUpdate(j, verletAcceleration);
+                ParticleUpdate(j, tSquared);
             }
         }
-        acceleration += deltaAcceleration * t;
 
         // Update mesh
         if (indicesModified)
@@ -173,8 +184,11 @@ public class VerletParticleSystem : MonoBehaviour
         }
     }
 
-    private void ParticleUpdate (int particle, Vector3 verletAcceleration)
+    private void ParticleUpdate (int particle, float tSquared)
     {
+        // Accumulate forces for particle
+        Vector3 verletAcceleration = ((force[particle] / particleMass) + baseAcceleration) * tSquared;
+
         Vector3 currentPosition = position[particle];
         Vector3 implicitVelocity = (currentPosition - priorPosition[particle]);
         position[particle] = currentPosition + implicitVelocity + verletAcceleration;
