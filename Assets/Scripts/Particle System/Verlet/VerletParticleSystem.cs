@@ -6,7 +6,6 @@ using UnityEngine;
 public class VerletParticleSystem : MonoBehaviour
 {
     const int kMaxParticles = 65000;
-    const int kNotInUse = -1;
 
     [SerializeField] private Spawner[] spawners;
     [SerializeField] private int maxParticles;
@@ -16,13 +15,13 @@ public class VerletParticleSystem : MonoBehaviour
     [SerializeField] private Vector3 deltaAcceleration;
 
     [Header("Verlet Particles")]
-    public Vector3[] position;
-    public Vector3[] priorPosition;
-    public float[] timeToLive;      // Particle removed if timeToLive <= 0
+    private Vector3[] position;
+    private Vector3[] priorPosition;
+    private float[] timeToLive;      // Particle removed if timeToLive <= 0
 
-    public int[] indexInIndices;    // Stores the index of the particle in indices, or kNotInUse if unused
-    public List<int> indices;
-    private bool indicesModified;
+    private bool[] inUse;
+    private List<int> indices;
+    private bool indicesModified = false;
 
     private int remainingParticles = 0;
     private bool paused = false;
@@ -32,12 +31,12 @@ public class VerletParticleSystem : MonoBehaviour
     {
         if (spawners.Length == 0)
         {
-            Debug.LogError("VerletParticleSystem.Start: No spawners found", this);
+            Debug.LogWarning("VerletParticleSystem.Start: No spawners found", this);
         }
 
-        if (maxParticles < 0 || maxParticles > kMaxParticles)
+        if (maxParticles <= 0 || maxParticles > kMaxParticles)
         {
-            Debug.LogError("VerletParticleSystem.Start: maxParticles set to invalid value, " + maxParticles + ", reset to " + kMaxParticles, this);
+            Debug.Log("VerletParticleSystem.Start: maxParticles set to invalid value, " + maxParticles + ", reset to " + kMaxParticles, this);
             maxParticles = kMaxParticles;
         }
 
@@ -74,7 +73,7 @@ public class VerletParticleSystem : MonoBehaviour
     // Returns the index the particle was inserted into
     private int AddSimpleParticle (SimpleParticle simpleParticle, int i = 0)
     {
-        while (indexInIndices[i] != kNotInUse)
+        while (inUse[i])
         {
             i++;
         }
@@ -82,7 +81,7 @@ public class VerletParticleSystem : MonoBehaviour
         position[i] = simpleParticle.position;
         priorPosition[i] = simpleParticle.position - (simpleParticle.velocity * Time.fixedDeltaTime);
         timeToLive[i] = simpleParticle.timeToLive;
-        indexInIndices[i] = indices.Count;
+        inUse[i] = true;
         indices.Add(i);
 
         if (!indicesModified)
@@ -93,27 +92,12 @@ public class VerletParticleSystem : MonoBehaviour
         return i;
     }
 
-    // Remove all particles whose timeToLive <= 0
-    //public void RemoveParticles ()
-    //{
-    //    // Iterate through the particles we know are alive (backwards for removal)
-    //    for (int i = (indices.Count - 1); i >= 0; i--)
-    //    {
-    //        int j = indices[i];
-    //        Debug.Assert(indexInIndices[j] == i);
-    //        if (timeToLive[j] <= 0)
-    //        {
-    //            RemoveParticle(i, j);
-    //        }
-    //    }
-    //}
-
     // i = the index in indices
     // j = the index of the actual particle
     public void RemoveParticle (int i, int j)
     {
         indices.RemoveAt(i);
-        indexInIndices[j] = kNotInUse;
+        inUse[j] = false;
 
         remainingParticles++;
         if (!indicesModified)
@@ -128,21 +112,14 @@ public class VerletParticleSystem : MonoBehaviour
         position = new Vector3[maxParticles];
         priorPosition = new Vector3[maxParticles];
         timeToLive = new float[maxParticles];
-        indexInIndices = new int[maxParticles];
+        inUse = new bool[maxParticles];
         indices = new List<int>(maxParticles);
-
-        // Set default values
-        for (int i = 0; i < maxParticles; i++)
-        {
-            indexInIndices[i] = kNotInUse;
-        }
 
         remainingParticles = maxParticles;
 
         for (int i = 0; i < spawners.Length && remainingParticles > 0; i++)
         {
-            SimpleParticle[] simpleParticles = spawners[i].GenerateInitialParticles();
-            AddSimpleParticles(simpleParticles);
+            AddSimpleParticles(spawners[i].GenerateInitialParticles());
         }
 
         // Set up for rendering particles
@@ -156,10 +133,18 @@ public class VerletParticleSystem : MonoBehaviour
     {
         Vector3 verletAcceleration = acceleration * t * t;
 
+        for (int i = 0; i < spawners.Length; i++)
+        {
+            AddSimpleParticles(spawners[i].GenerateInitialParticles());
+        }
+
         for (int i = (indices.Count - 1); i >= 0; i--)
         {
             int j = indices[i];
-            Debug.Assert(indexInIndices[j] == i);
+            if (!inUse[j])
+            {
+                Debug.LogError("Not In Use: j = " + j + ", i = " + i + ", inUse[j] = " + inUse[j]);
+            }
 
             if (timeToLive[j] <= t)
             {

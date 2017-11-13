@@ -156,6 +156,8 @@ MonoBehaviour:
   xVelRange: {x: 5, y: 5}
   yVelRange: {x: 5, y: 10}
   zVelRange: {x: 0, y: 0}
+  initialParticles: 100
+  timeToLive: 1
 --- !u!114 &326461867
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -167,11 +169,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7afd1c9157d82d458c2036402977d50, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawner: {fileID: 326461866}
-  particlePrefab: {fileID: 1663848538987322, guid: 1f6f9e543e9b7754ea5b827d3dc8d087,
-    type: 2}
-  initialParticles: 100
-  timeToLive: 5
+  spawners:
+  - {fileID: 326461866}
+  maxParticles: 0
   acceleration: {x: 0, y: -9.8, z: 0}
   deltaAcceleration: {x: 0, y: 4.5, z: 0}
 --- !u!23 &326461868
