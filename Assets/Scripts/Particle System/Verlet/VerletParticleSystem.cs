@@ -6,6 +6,7 @@ public class VerletParticleSystem : MonoBehaviour
 {
     const int kMaxParticles = 65000;
     const int kParticleMass = 1;
+    const float kCollisionError = 0;
 
     [SerializeField] private Terrain terrain;
     [SerializeField] private bool printTerrainCoordinates;
@@ -188,26 +189,54 @@ public class VerletParticleSystem : MonoBehaviour
 
     private void ParticleUpdate (int particle, float tSquared)
     {
-        if (printTerrainCoordinates)
-        {
-            PrintTerrainCoordinates(position[particle]);
-        }
-
         // Accumulate forces for particle
         Vector3 verletAcceleration = ((force[particle] / particleMass) + baseAcceleration) * tSquared;
 
+        // Calculate next step
         Vector3 currentPosition = position[particle];
         Vector3 implicitVelocity = (currentPosition - priorPosition[particle]);
-        position[particle] = currentPosition + implicitVelocity + verletAcceleration;
+        Vector3 nextPosition = currentPosition + implicitVelocity + verletAcceleration;
+
+        // Check for collision
+        if (terrain != null)
+        {
+            if (printTerrainCoordinates)
+            {
+                PrintTerrainCoordinates(position[particle]);
+            }
+
+            //Vector2 currentTerrainPosition = GetNormalizedPositionOnTerrain(currentPosition + transform.position);
+            Vector3 nextWorldPosition = nextPosition + transform.position;
+            Vector2 nextTerrainPosition = GetNormalizedPositionOnTerrain(nextWorldPosition);
+            float height = terrain.terrainData.GetInterpolatedHeight(nextTerrainPosition.x, nextTerrainPosition.y);
+            float heightDiff = (nextWorldPosition.y - height);
+
+            if (heightDiff <= kCollisionError)
+            {
+                Vector3 normal = terrain.terrainData.GetInterpolatedNormal(nextTerrainPosition.x, nextTerrainPosition.y);
+                Debug.Log("Colliding");
+            }
+        }
+
+        position[particle] = nextPosition;
         priorPosition[particle] = currentPosition;
+    }
+
+    private Vector2 GetNormalizedPositionOnTerrain(Vector3 worldPosition)
+    {
+        Vector3 offsetFromTerrain = worldPosition - terrain.GetPosition();
+        return new Vector2(Mathf.InverseLerp(0, terrain.terrainData.size.x, offsetFromTerrain.x), Mathf.InverseLerp(0, terrain.terrainData.size.z, offsetFromTerrain.z));
     }
 
     private void PrintTerrainCoordinates (Vector3 position)
     {
-        Vector3 offsetFromTerrain = (transform.position + position) - terrain.GetPosition();
+        Vector3 worldPosition = (transform.position + position);
+        Vector3 offsetFromTerrain = worldPosition - terrain.GetPosition();
         Vector2 normalizedPosition = new Vector2(Mathf.InverseLerp(0, terrain.terrainData.size.x, offsetFromTerrain.x), Mathf.InverseLerp(0, terrain.terrainData.size.z, offsetFromTerrain.z));
+        float height = terrain.terrainData.GetInterpolatedHeight(normalizedPosition.x, normalizedPosition.y);
+        Vector3 normal = terrain.terrainData.GetInterpolatedNormal(normalizedPosition.x, normalizedPosition.y);
 
         Debug.Log("At World Postion: " + position + ", TerrainOffset: " + offsetFromTerrain + ", NormalizedPosition: " + normalizedPosition);
-        Debug.Log("InterpolatedHeight: " + terrain.terrainData.GetInterpolatedHeight(normalizedPosition.x, normalizedPosition.y) + ", InterpolatedNormal: " + terrain.terrainData.GetInterpolatedNormal(normalizedPosition.x, normalizedPosition.y));
+        Debug.Log("InterpolatedHeight: " + height + ", HeightDiff: " + (worldPosition.y - height) + ", InterpolatedNormal: " + normal);
     }
 }
