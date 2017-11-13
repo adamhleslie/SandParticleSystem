@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,6 +6,9 @@ public class VerletParticleSystem : MonoBehaviour
 {
     const int kMaxParticles = 65000;
     const int kParticleMass = 1;
+
+    [SerializeField] private Terrain terrain;
+    [SerializeField] private bool printTerrainCoordinates;
 
     [SerializeField] private Spawner[] spawners;
     [SerializeField] private int maxParticles;
@@ -72,7 +74,7 @@ public class VerletParticleSystem : MonoBehaviour
     {
         if (simpleParticles != null)
         {
-            int newParticles = Math.Min(simpleParticles.Length, remainingParticles);
+            int newParticles = Mathf.Min(simpleParticles.Length, remainingParticles);
             for (int i = 0, j = 0; i < newParticles; i++)
             {
                 j = AddSimpleParticle(simpleParticles[i], j) + 1;
@@ -91,7 +93,7 @@ public class VerletParticleSystem : MonoBehaviour
 
         position[i] = simpleParticle.position;
         priorPosition[i] = simpleParticle.position - (simpleParticle.velocity * Time.fixedDeltaTime);
-        force[i] = new Vector3(UnityEngine.Random.Range(xRangeForce.x, xRangeForce.y), UnityEngine.Random.Range(yRangeForce.x, yRangeForce.y), UnityEngine.Random.Range(zRangeForce.x, zRangeForce.y));
+        force[i] = new Vector3(Random.Range(xRangeForce.x, xRangeForce.y), Random.Range(yRangeForce.x, yRangeForce.y), Random.Range(zRangeForce.x, zRangeForce.y));
         timeToLive[i] = simpleParticle.timeToLive;
         inUse[i] = true;
         indices.Add(i);
@@ -146,10 +148,10 @@ public class VerletParticleSystem : MonoBehaviour
     {
         float tSquared = t * t;
 
-        for (int i = 0; i < spawners.Length; i++)
-        {
-            AddSimpleParticles(spawners[i].GenerateInitialParticles());
-        }
+        //for (int i = 0; i < spawners.Length; i++)
+        //{
+        //    AddSimpleParticles(spawners[i].GenerateInitialParticles());
+        //}
 
         for (int i = (indices.Count - 1); i >= 0; i--)
         {
@@ -186,6 +188,11 @@ public class VerletParticleSystem : MonoBehaviour
 
     private void ParticleUpdate (int particle, float tSquared)
     {
+        if (printTerrainCoordinates)
+        {
+            PrintTerrainCoordinates(position[particle]);
+        }
+
         // Accumulate forces for particle
         Vector3 verletAcceleration = ((force[particle] / particleMass) + baseAcceleration) * tSquared;
 
@@ -193,5 +200,14 @@ public class VerletParticleSystem : MonoBehaviour
         Vector3 implicitVelocity = (currentPosition - priorPosition[particle]);
         position[particle] = currentPosition + implicitVelocity + verletAcceleration;
         priorPosition[particle] = currentPosition;
+    }
+
+    private void PrintTerrainCoordinates (Vector3 position)
+    {
+        Vector3 offsetFromTerrain = (transform.position + position) - terrain.GetPosition();
+        Vector2 normalizedPosition = new Vector2(Mathf.InverseLerp(0, terrain.terrainData.size.x, offsetFromTerrain.x), Mathf.InverseLerp(0, terrain.terrainData.size.z, offsetFromTerrain.z));
+
+        Debug.Log("At World Postion: " + position + ", TerrainOffset: " + offsetFromTerrain + ", NormalizedPosition: " + normalizedPosition);
+        Debug.Log("InterpolatedHeight: " + terrain.terrainData.GetInterpolatedHeight(normalizedPosition.x, normalizedPosition.y) + ", InterpolatedNormal: " + terrain.terrainData.GetInterpolatedNormal(normalizedPosition.x, normalizedPosition.y));
     }
 }
