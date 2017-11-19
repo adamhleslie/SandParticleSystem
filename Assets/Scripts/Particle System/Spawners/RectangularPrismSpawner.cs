@@ -14,7 +14,6 @@ public class RectangularPrismSpawner : Spawner
     public Vector2 yVelRange;
     public Vector2 zVelRange;
 
-    public int initialParticles;
     public float timeToLive;
 
     public override SimpleParticle GenerateParticle ()
@@ -23,10 +22,5 @@ public class RectangularPrismSpawner : Spawner
         Vector3 velocity = new Vector3(Random.Range(xVelRange.x, xVelRange.y), Random.Range(yVelRange.x, yVelRange.y), Random.Range(zVelRange.x, zVelRange.y));
 
         return new SimpleParticle(position, velocity, timeToLive);
-    }
-
-    public override SimpleParticle[] GenerateInitialParticles()
-    {
-        return GenerateParticles(initialParticles);
     }
 }

@@ -27,7 +27,7 @@ public class VerletParticleSystem : MonoBehaviour
     private Vector3[] force;
     private float[] timeToLive;      // Particle removed if timeToLive <= 0
 
-    private bool[] inUse;
+    private bool[] inUse;   // TODO convert to free list implementation
     private List<int> indices;
     private bool indicesModified = false;
 
@@ -149,10 +149,10 @@ public class VerletParticleSystem : MonoBehaviour
     {
         float tSquared = t * t;
 
-        //for (int i = 0; i < spawners.Length; i++)
-        //{
-        //    AddSimpleParticles(spawners[i].GenerateInitialParticles());
-        //}
+        for (int i = 0; i < spawners.Length; i++)
+        {
+            AddSimpleParticles(spawners[i].GenerateParticles());
+        }
 
         for (int i = (indices.Count - 1); i >= 0; i--)
         {
@@ -214,7 +214,7 @@ public class VerletParticleSystem : MonoBehaviour
             if (heightDiff <= kCollisionError)
             {
                 Vector3 normal = terrain.terrainData.GetInterpolatedNormal(nextTerrainPosition.x, nextTerrainPosition.y);
-                Debug.Log("Colliding");
+                Debug.Log("Colliding: " + normal);
             }
         }
 

@@ -18,9 +18,17 @@ public struct SimpleParticle
 
 public abstract class Spawner : MonoBehaviour
 {
+    [SerializeField] protected int initialParticles;
+    [SerializeField] protected int spawnedParticles;
+
     public abstract SimpleParticle GenerateParticle();
 
-    public SimpleParticle[] GenerateParticles(int numParticles)
+    public SimpleParticle[] GenerateParticles ()
+    {
+        return GenerateParticles(spawnedParticles);
+    }
+
+    public SimpleParticle[] GenerateParticles (int numParticles)
     {
         SimpleParticle[] particles = new SimpleParticle[numParticles];
         for (int i = 0; i < numParticles; i++)
@@ -31,8 +39,8 @@ public abstract class Spawner : MonoBehaviour
         return particles;
     }
 
-    public virtual SimpleParticle[] GenerateInitialParticles ()
+    public SimpleParticle[] GenerateInitialParticles()
     {
-        return null;
+        return GenerateParticles(initialParticles);
     }
 }

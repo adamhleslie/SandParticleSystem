@@ -157,7 +157,7 @@ MonoBehaviour:
   yVelRange: {x: 0, y: 0}
   zVelRange: {x: 25, y: 25}
   initialParticles: 1
-  timeToLive: 100
+  timeToLive: 20
 --- !u!114 &326461867
 MonoBehaviour:
   m_ObjectHideFlags: 0
