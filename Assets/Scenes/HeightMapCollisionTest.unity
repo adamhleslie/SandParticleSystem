@@ -150,13 +150,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed7787913a750ed4da062302b1ec9db1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  initialParticles: 100
+  spawnedParticles: 0
   xRange: {x: -1, y: 1}
   yRange: {x: -1, y: 1}
   zRange: {x: -1, y: 1}
   xVelRange: {x: -5, y: 5}
   yVelRange: {x: 5, y: 10}
   zVelRange: {x: -5, y: 5}
-  initialParticles: 100
   timeToLive: 100
 --- !u!114 &326461867
 MonoBehaviour:
@@ -170,6 +171,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 1563362720}
+  terrainCollider: {fileID: 1563362719}
   printTerrainCoordinates: 0
   spawners:
   - {fileID: 326461866}

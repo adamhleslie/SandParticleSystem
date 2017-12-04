@@ -3,14 +3,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class VerletParticleSystem : MonoBehaviour
+public class VerletInvalidCollision : MonoBehaviour
 {
     const int kMaxParticles = 65000;
     const int kParticleMass = 1;
     const float kCollisionError = 0;
 
     [SerializeField] private Terrain terrain;
-    [SerializeField] private TerrainCollider terrainCollider;
     [SerializeField] private bool printTerrainCoordinates;
 
     [SerializeField] private Spawner[] spawners;
@@ -196,55 +195,161 @@ public class VerletParticleSystem : MonoBehaviour
 
         // Calculate next step
         Vector3 currentPosition = position[particle];
-        Vector3 implicitVelocity = currentPosition - priorPosition[particle];
+        Vector3 implicitVelocity = (currentPosition - priorPosition[particle]);
         Vector3 nextPosition = currentPosition + implicitVelocity + verletAcceleration;
 
+        //// Old Collision Detection
+        //if (terrain != null)
+        //{
+        //    Vector3 currentWorldPosition = currentPosition + transform.position;
+        //    if (printTerrainCoordinates)
+        //    {
+        //        PrintTerrainCoordinates(position[particle]);
+        //    }
+
+        //    Vector3 nextWorldPosition = nextPosition + transform.position;
+        //    Vector2 nextTerrainPosition = GetNormalizedPositionOnTerrain(nextWorldPosition);
+        //    float height = terrain.terrainData.GetInterpolatedHeight(nextTerrainPosition.x, nextTerrainPosition.y);
+        //    float heightDiff = nextWorldPosition.y - height;
+
+        //    if (heightDiff <= kCollisionError)
+        //    {
+        //        Vector3 normal = terrain.terrainData.GetInterpolatedNormal(nextTerrainPosition.x, nextTerrainPosition.y);
+        //        timeToLive[particle] = 0;
+        //        Debug.Log("Colliding: " + normal);
+        //    }
+        //}
+
+
+        // NEW NEW
+        //Vector2 u0, u1, v0, v1;
+        //if (uv[0] > uv[1])
+        //{
+        //    u0 = nextTerrainIndexBound; // z00
+        //    u1 = new Vector2(nextTerrainIndexBound.x + 1, nextTerrainIndexBound.y); // z10
+        //    v0 = new Vector2(nextTerrainIndexBound.x + 1, nextTerrainIndexBound.y); // z10
+        //    v1 = new Vector2(nextTerrainIndexBound.x + 1, nextTerrainIndexBound.y + 1); // z11
+        //}
+        //else
+        //{
+        //    u0 = new Vector2(nextTerrainIndexBound.x, nextTerrainIndexBound.y + 1); // z01
+        //    u1 = new Vector2(nextTerrainIndexBound.x + 1, nextTerrainIndexBound.y + 1); // z11
+        //    v0 = nextTerrainIndexBound; // z00
+        //    v1 = new Vector2(nextTerrainIndexBound.x, nextTerrainIndexBound.y + 1); // z01
+        //}
+
+        //float approxHeight = GetHeight(nextTerrainIndexBound) + ((GetHeight(u1) - GetHeight(u0)) * uv[0]) + ((GetHeight(v1) - GetHeight(v0)) * uv[1]);
+
         // Check for collision
-        if (terrain != null && terrainCollider != null)
+        if (terrain != null)
         {
+            Vector3 currentWorldPosition = currentPosition + transform.position;
             if (printTerrainCoordinates)
             {
                 PrintTerrainCoordinates(position[particle]);
             }
 
-            // Calculate height at next position
+            Vector3 direction = nextPosition - currentWorldPosition;
             Vector3 nextWorldPosition = nextPosition + transform.position;
+            Vector2 nextTerrainIndex = GetIndexPositionOnTerrain(nextWorldPosition);
+            Vector2 nextTerrainIndexBound = new Vector2((int) nextTerrainIndex.x, (int) nextTerrainIndex.y);
+            Vector2 uv = nextTerrainIndex - nextTerrainIndexBound;
+
+            Vector3 a, b, c;
+            FillPoints(nextTerrainIndexBound, uv[0] > uv[1], out a, out b, out c);
+
+            bool collision = IntersectTriangle(a, b, c, new Ray(currentWorldPosition, direction));
+            // Vector3 baryCoords = GetBarycentricCoords(nextWorldPosition, a, b, c);
+
             Vector2 nextTerrainPosition = GetNormalizedPositionOnTerrain(nextWorldPosition);
             float height = terrain.terrainData.GetInterpolatedHeight(nextTerrainPosition.x, nextTerrainPosition.y);
             float heightDiff = nextWorldPosition.y - height;
 
-            // If particle height below mesh height, find collision point
             if (heightDiff <= kCollisionError)
             {
-                RaycastHit hitInfo;
-                Vector3 currentWorldPosition = currentPosition + transform.position;
-                Vector3 nextVelocity = nextPosition - currentPosition;
-                terrainCollider.Raycast(new Ray(currentWorldPosition, nextVelocity), out hitInfo, nextVelocity.magnitude);
-
-                Vector2 normalizedCollisionPoint = GetNormalizedPositionOnTerrain(hitInfo.point);
-                Vector3 interpolatedNormal = terrain.terrainData.GetInterpolatedNormal(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
-                float interpolatedHeight = terrain.terrainData.GetInterpolatedHeight(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
-
-                //Debug.Log(interpolatedNormal.x + " VS " + hitInfo.normal.x);
-
-                // Calculate Barycentric Coordinates
-                Vector2 nextTerrainIndex = GetIndexPositionOnTerrain(nextWorldPosition);
-                Vector2 nextTerrainIndexBound = new Vector2((int)nextTerrainIndex.x, (int)nextTerrainIndex.y);
-                Vector2 uv = nextTerrainIndex - nextTerrainIndexBound;
-
-                // Points of colliding triangle
-                Vector3 a, b, c;
-                FillPoints(nextTerrainIndexBound, uv[0] > uv[1], out a, out b, out c);
-
-                //Debug.Log("Colliding at " + hitInfo.point + " between - " + currentWorldPosition + ", " + nextWorldPosition + " | n = " + normal + ", h = " + collisionHeight);
-                //Debug.Log("On Triangle " + a + " - " + b + " - " + c);
-
+                Vector3 normal = terrain.terrainData.GetInterpolatedNormal(nextTerrainPosition.x, nextTerrainPosition.y);
                 timeToLive[particle] = 0;
+                Debug.Log("Colliding: " + normal);
+                Debug.Log(collision + " | " + height);
             }
         }
 
         position[particle] = nextPosition;
         priorPosition[particle] = currentPosition;
+    }
+
+    private void FillPoints (Vector2 nextTerrainIndexBound, bool bottomTriangle, out Vector3 a, out Vector3 b, out Vector3 c)
+    {
+        float[,] heights = terrain.terrainData.GetHeights((int)nextTerrainIndexBound.x, (int)nextTerrainIndexBound.y, 2, 2);
+
+        Vector2 aIndex, bIndex, cIndex;
+        if (!bottomTriangle)
+        {
+            aIndex = new Vector2(1, 1); // z11
+            bIndex = new Vector2(0, 0); // z00
+            cIndex = new Vector2(1, 0); // z10
+        }
+        else
+        {
+            aIndex = new Vector2(1, 1); // z11
+            bIndex = new Vector2(0, 1); // z01
+            cIndex = new Vector2(0, 0); // z00
+        }
+
+        a = new Vector3(aIndex[0] * terrain.terrainData.heightmapScale[0], aIndex[1] * terrain.terrainData.heightmapScale[1], heights[(int)aIndex[0], (int)aIndex[1]]);
+        b = new Vector3(bIndex[0] * terrain.terrainData.heightmapScale[0], bIndex[1] * terrain.terrainData.heightmapScale[1], heights[(int)bIndex[0], (int)bIndex[1]]);
+        c = new Vector3(cIndex[0] * terrain.terrainData.heightmapScale[0], cIndex[1] * terrain.terrainData.heightmapScale[1], heights[(int)cIndex[0], (int)cIndex[1]]);
+    }
+
+    // From https://answers.unity.com/questions/861719/a-fast-triangle-triangle-intersection-algorithm-fo.html
+    private static bool IntersectTriangle (Vector3 p1, Vector3 p2, Vector3 p3, Ray ray)
+    {
+        // Vectors from p1 to p2/p3 (edges)
+        Vector3 e1, e2;
+
+        Vector3 p, q, t;
+        float det, invDet, u, v;
+
+        //Find vectors for two edges sharing vertex/point p1
+        e1 = p2 - p1;
+        e2 = p3 - p1;
+
+        // calculating determinant 
+        p = Vector3.Cross(ray.direction, e2);
+
+        //Calculate determinat
+        det = Vector3.Dot(e1, p);
+
+        //if determinant is near zero, ray lies in plane of triangle otherwise not
+        if (det > -Mathf.Epsilon && det < Mathf.Epsilon) { return false; }
+        invDet = 1.0f / det;
+
+        //calculate distance from p1 to ray origin
+        t = ray.origin - p1;
+
+        //Calculate u parameter
+        u = Vector3.Dot(t, p) * invDet;
+
+        //Check for ray hit
+        if (u < 0 || u > 1) { return false; }
+
+        //Prepare to test v parameter
+        q = Vector3.Cross(t, e1);
+
+        //Calculate v parameter
+        v = Vector3.Dot(ray.direction, q) * invDet;
+
+        //Check for ray hit
+        if (v < 0 || u + v > 1) { return false; }
+
+        if ((Vector3.Dot(e2, q) * invDet) > Mathf.Epsilon)
+        {
+            //ray does intersect
+            return true;
+        }
+
+        // No hit at all
+        return false;
     }
 
     // Returns (u, v, w)
@@ -268,29 +373,6 @@ public class VerletParticleSystem : MonoBehaviour
     }
 
     // Terrain functions
-
-    private void FillPoints (Vector2 nextTerrainIndexBound, bool bottomTriangle, out Vector3 a, out Vector3 b, out Vector3 c)
-    {
-        float[,] heights = terrain.terrainData.GetHeights((int)nextTerrainIndexBound.x, (int)nextTerrainIndexBound.y, 2, 2);
-
-        Vector2 aIndex, bIndex, cIndex;
-        if (!bottomTriangle)
-        {
-            aIndex = new Vector2(1, 1); // z11
-            bIndex = new Vector2(0, 0); // z00
-            cIndex = new Vector2(1, 0); // z10
-        }
-        else
-        {
-            aIndex = new Vector2(1, 1); // z11
-            bIndex = new Vector2(0, 1); // z01
-            cIndex = new Vector2(0, 0); // z00
-        }
-
-        a = new Vector3((nextTerrainIndexBound[0] + aIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)aIndex[0], (int)aIndex[1]], (nextTerrainIndexBound[1] + aIndex[1]) * terrain.terrainData.heightmapScale[2]);
-        b = new Vector3((nextTerrainIndexBound[0] + bIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)bIndex[0], (int)bIndex[1]], (nextTerrainIndexBound[1] + bIndex[1]) * terrain.terrainData.heightmapScale[2]);
-        c = new Vector3((nextTerrainIndexBound[0] + cIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)cIndex[0], (int)cIndex[1]], (nextTerrainIndexBound[1] + cIndex[1]) * terrain.terrainData.heightmapScale[2]);
-    }
 
     private float GetHeight (Vector2 xy)
     {

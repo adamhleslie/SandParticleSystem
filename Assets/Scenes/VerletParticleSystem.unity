@@ -150,8 +150,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed7787913a750ed4da062302b1ec9db1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  initialParticles: 20000
-  spawnedParticles: 5
+  initialParticles: 30000
+  spawnedParticles: 0
   xRange: {x: -1, y: 1}
   yRange: {x: 0, y: 0}
   zRange: {x: -5, y: 5}
