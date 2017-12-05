@@ -225,7 +225,7 @@ public class VerletParticleSystem : MonoBehaviour
                 Vector3 interpolatedNormal = terrain.terrainData.GetInterpolatedNormal(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
                 float interpolatedHeight = terrain.terrainData.GetInterpolatedHeight(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
 
-                //Debug.Log(interpolatedNormal.x + " VS " + hitInfo.normal.x);
+                Debug.Log(interpolatedNormal + " VS " + hitInfo.normal);
 
                 // Calculate Barycentric Coordinates
                 Vector2 nextTerrainIndex = GetIndexPositionOnTerrain(nextWorldPosition);
@@ -235,6 +235,7 @@ public class VerletParticleSystem : MonoBehaviour
                 // Points of colliding triangle
                 Vector3 a, b, c;
                 FillPoints(nextTerrainIndexBound, uv[0] > uv[1], out a, out b, out c);
+                Vector3 barycentricCoords = GetBarycentricCoords(nextWorldPosition, a, b, c);
 
                 //Debug.Log("Colliding at " + hitInfo.point + " between - " + currentWorldPosition + ", " + nextWorldPosition + " | n = " + normal + ", h = " + collisionHeight);
                 //Debug.Log("On Triangle " + a + " - " + b + " - " + c);
@@ -287,9 +288,9 @@ public class VerletParticleSystem : MonoBehaviour
             cIndex = new Vector2(0, 0); // z00
         }
 
-        a = new Vector3((nextTerrainIndexBound[0] + aIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)aIndex[0], (int)aIndex[1]], (nextTerrainIndexBound[1] + aIndex[1]) * terrain.terrainData.heightmapScale[2]);
-        b = new Vector3((nextTerrainIndexBound[0] + bIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)bIndex[0], (int)bIndex[1]], (nextTerrainIndexBound[1] + bIndex[1]) * terrain.terrainData.heightmapScale[2]);
-        c = new Vector3((nextTerrainIndexBound[0] + cIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)cIndex[0], (int)cIndex[1]], (nextTerrainIndexBound[1] + cIndex[1]) * terrain.terrainData.heightmapScale[2]);
+        a = new Vector3((nextTerrainIndexBound[0] + aIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)aIndex[0], (int)aIndex[1]] * terrain.terrainData.heightmapScale[1], (nextTerrainIndexBound[1] + aIndex[1]) * terrain.terrainData.heightmapScale[2]);
+        b = new Vector3((nextTerrainIndexBound[0] + bIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)bIndex[0], (int)bIndex[1]] * terrain.terrainData.heightmapScale[1], (nextTerrainIndexBound[1] + bIndex[1]) * terrain.terrainData.heightmapScale[2]);
+        c = new Vector3((nextTerrainIndexBound[0] + cIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)cIndex[0], (int)cIndex[1]] * terrain.terrainData.heightmapScale[1], (nextTerrainIndexBound[1] + cIndex[1]) * terrain.terrainData.heightmapScale[2]);
     }
 
     private float GetHeight (Vector2 xy)
