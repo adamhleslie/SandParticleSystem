@@ -216,18 +216,18 @@ public class VerletParticleSystem : MonoBehaviour
             // If particle height below mesh height, find collision point
             if (heightDiff <= kCollisionError)
             {
-                // Find hit point
+                // Find collision point
                 RaycastHit hitInfo;
                 Vector3 currentWorldPosition = currentPosition + transform.position;
                 Vector3 nextVelocity = nextPosition - currentPosition;
                 if (!terrainCollider.Raycast(new Ray(currentWorldPosition, nextVelocity), out hitInfo, nextVelocity.magnitude))
                 {
-                    Debug.LogError("VerletParticleSystem.ParticleUpdate: Below height, but no collision, with particle " + particle);
+                    Debug.LogError("VerletParticleSystem.ParticleUpdate: Below height, but no collision with particle " + particle);
                 }
 
-                Vector2 normalizedCollisionPoint = GetNormalizedPositionOnTerrain(hitInfo.point);
-                Vector3 interpolatedNormal = terrain.terrainData.GetInterpolatedNormal(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
-                float interpolatedHeight = terrain.terrainData.GetInterpolatedHeight(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
+                //Vector2 normalizedCollisionPoint = GetNormalizedPositionOnTerrain(hitInfo.point);
+                //Vector3 interpolatedNormal = terrain.terrainData.GetInterpolatedNormal(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
+                //float interpolatedHeight = terrain.terrainData.GetInterpolatedHeight(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
                 //Debug.Log(interpolatedNormal.x + ", " + interpolatedNormal.y + ", " + interpolatedNormal.z + " VS " + hitInfo.normal.x + ", " + hitInfo.normal.y + ", " + hitInfo.normal.z);
 
                 // Calculate Barycentric Coordinates
@@ -249,6 +249,16 @@ public class VerletParticleSystem : MonoBehaviour
                 //Debug.Log(hitInfo.point - ((a * barycentricCoords.x) + (b * barycentricCoords.y) + (c * barycentricCoords.z)));
                 //Debug.Log("Colliding at " + hitInfo.point + " between - " + currentWorldPosition + ", " + nextWorldPosition + " | n = " + normal + ", h = " + collisionHeight);
                 //Debug.Log("On Triangle " + a + " - " + b + " - " + c);
+
+                // Calculate velocity (taking in account distance traveled so far)
+
+                // if bounce
+                // Calculate new trajectory
+                // Calculate new position, and modify priorPosition as needed
+
+                // if absorbed
+                // Calculate new heights for each index based on barycentric coords
+                // Apply heights to terrain
 
                 timeToLive[particle] = 0;
             }
