@@ -216,27 +216,37 @@ public class VerletParticleSystem : MonoBehaviour
             // If particle height below mesh height, find collision point
             if (heightDiff <= kCollisionError)
             {
+                // Find hit point
                 RaycastHit hitInfo;
                 Vector3 currentWorldPosition = currentPosition + transform.position;
                 Vector3 nextVelocity = nextPosition - currentPosition;
-                terrainCollider.Raycast(new Ray(currentWorldPosition, nextVelocity), out hitInfo, nextVelocity.magnitude);
+                if (!terrainCollider.Raycast(new Ray(currentWorldPosition, nextVelocity), out hitInfo, nextVelocity.magnitude))
+                {
+                    Debug.LogError("VerletParticleSystem.ParticleUpdate: Below height, but no collision, with particle " + particle);
+                }
 
                 Vector2 normalizedCollisionPoint = GetNormalizedPositionOnTerrain(hitInfo.point);
                 Vector3 interpolatedNormal = terrain.terrainData.GetInterpolatedNormal(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
                 float interpolatedHeight = terrain.terrainData.GetInterpolatedHeight(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
-
-                Debug.Log(interpolatedNormal + " VS " + hitInfo.normal);
+                //Debug.Log(interpolatedNormal.x + ", " + interpolatedNormal.y + ", " + interpolatedNormal.z + " VS " + hitInfo.normal.x + ", " + hitInfo.normal.y + ", " + hitInfo.normal.z);
 
                 // Calculate Barycentric Coordinates
-                Vector2 nextTerrainIndex = GetIndexPositionOnTerrain(nextWorldPosition);
-                Vector2 nextTerrainIndexBound = new Vector2((int)nextTerrainIndex.x, (int)nextTerrainIndex.y);
-                Vector2 uv = nextTerrainIndex - nextTerrainIndexBound;
+                Vector2 terrainIndex = GetIndexPositionOnTerrain(hitInfo.point);
+                Vector2 terrainIndexBound = new Vector2((int) terrainIndex.x, (int) terrainIndex.y);
+                Vector2 uv = terrainIndex - terrainIndexBound;
 
                 // Points of colliding triangle
-                Vector3 a, b, c;
-                FillPoints(nextTerrainIndexBound, uv[0] > uv[1], out a, out b, out c);
-                Vector3 barycentricCoords = GetBarycentricCoords(nextWorldPosition, a, b, c);
+                Vector3 a, b, c; 
+                FillPoints(terrainIndexBound, uv[0] < uv[1], out a, out b, out c);
 
+                Vector3 barycentricCoords = GetBarycentricCoords(hitInfo.point, a, b, c);
+                if (barycentricCoords.x < 0 || barycentricCoords.y < 0 || barycentricCoords.z < 0)
+                {
+                    Debug.LogError("VerletParticleSystem.ParticleUpdate: Invalid collision with particle " + particle + " at " + hitInfo.point + ", Barrycentric Coordinates: " + barycentricCoords);
+                }
+
+                //Debug.Log(barycentricCoords);
+                //Debug.Log(hitInfo.point - ((a * barycentricCoords.x) + (b * barycentricCoords.y) + (c * barycentricCoords.z)));
                 //Debug.Log("Colliding at " + hitInfo.point + " between - " + currentWorldPosition + ", " + nextWorldPosition + " | n = " + normal + ", h = " + collisionHeight);
                 //Debug.Log("On Triangle " + a + " - " + b + " - " + c);
 
@@ -270,12 +280,12 @@ public class VerletParticleSystem : MonoBehaviour
 
     // Terrain functions
 
-    private void FillPoints (Vector2 nextTerrainIndexBound, bool bottomTriangle, out Vector3 a, out Vector3 b, out Vector3 c)
+    private void FillPoints (Vector2 nextTerrainIndexBound, bool topTriangle, out Vector3 a, out Vector3 b, out Vector3 c)
     {
         float[,] heights = terrain.terrainData.GetHeights((int)nextTerrainIndexBound.x, (int)nextTerrainIndexBound.y, 2, 2);
 
         Vector2 aIndex, bIndex, cIndex;
-        if (!bottomTriangle)
+        if (!topTriangle)
         {
             aIndex = new Vector2(1, 1); // z11
             bIndex = new Vector2(0, 0); // z00
