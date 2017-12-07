@@ -265,7 +265,7 @@ public class VerletParticleSystem : MonoBehaviour
                     float test = IsBelowTerrain(nextPosition + transform.position);
                     if (test != 0)
                     {
-                        Debug.Log("New Velocity TOO LOW " + test);
+                        //Debug.Log("New Velocity TOO LOW " + test);
                     }
                 }
                 else
