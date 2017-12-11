@@ -143,7 +143,7 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 326461864}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 229.5, y: 72.2, z: 272.4}
+  m_LocalPosition: {x: 293.6, y: 30.5, z: 343.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -160,14 +160,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed7787913a750ed4da062302b1ec9db1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  initialParticles: 1
+  initialParticles: 20
   spawnedParticles: 0
-  xRange: {x: 0, y: 0}
+  xRange: {x: -1, y: 0}
   yRange: {x: 0, y: 0}
-  zRange: {x: 1, y: 1}
+  zRange: {x: 0, y: 0}
   xVelRange: {x: -5, y: -5}
-  yVelRange: {x: 6, y: 6}
-  zVelRange: {x: 2.3, y: 2.3}
+  yVelRange: {x: 0, y: 0}
+  zVelRange: {x: 0, y: 0}
   timeToLive: 100
 --- !u!114 &326461867
 MonoBehaviour:

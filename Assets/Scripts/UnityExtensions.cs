@@ -15,3 +15,11 @@ public static class MonoBehaviorExtensions
         return result;
     }
 }
+
+public static class Vector3Extensions
+{
+    static public string ToFullString (this Vector3 vec)
+    {
+        return "(" + vec.x + ", " + vec.y + ", " + vec.z + ")";
+    }
+}
