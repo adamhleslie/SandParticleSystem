@@ -133,7 +133,7 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 326461864}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 263.1, y: 37.25, z: 144.1}
+  m_LocalPosition: {x: 210.3, y: 37.25, z: 241}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -173,10 +173,10 @@ MonoBehaviour:
   terrain: {fileID: 1563362720}
   terrainCollider: {fileID: 1563362719}
   terrainRestitution: 0.3
-  absorptionVelocity: 0
+  absorptionVelocity: 0.4
   useInterpolatedNormal: 0
   printTerrainCoordinates: 0
-  absorptionHeightModifier: 0.1
+  absorptionHeightModifier: 0.02
   spawners:
   - {fileID: 326461866}
   maxParticles: 0

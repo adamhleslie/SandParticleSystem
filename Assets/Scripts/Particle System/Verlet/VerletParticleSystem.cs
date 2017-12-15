@@ -13,10 +13,11 @@ public class VerletParticleSystem : MonoBehaviour
     [Header("Terrain Physics")]
     [SerializeField] private Terrain terrain;
     [SerializeField] private TerrainCollider terrainCollider;
-    [SerializeField] private float terrainRestitution;
-    [SerializeField] private float absorptionVelocity;
+    [SerializeField] private float terrainRestitution = .3f;
+    [SerializeField] private float absorptionVelocity = 0;
     [SerializeField] private bool useInterpolatedNormal = true;
     [SerializeField] private bool printTerrainCoordinates;
+    [SerializeField] private float absorptionHeightModifier = .1f;
 
     [Header("Spawn Settings")]
     [SerializeField] private Spawner[] spawners;
@@ -38,6 +39,7 @@ public class VerletParticleSystem : MonoBehaviour
     private bool[] inUse;   // TODO convert to free list implementation
     private List<int> indices;
     private bool indicesModified = false;
+    private bool terrainModified = false;
 
     private int remainingParticles = 0;
     private bool paused = false;
@@ -60,6 +62,11 @@ public class VerletParticleSystem : MonoBehaviour
         {
             Debug.Log("VerletParticleSystem.Start: particleMass invalid, " + particleMass + ", reset to " + kParticleMass, this);
             particleMass = kParticleMass;
+        }
+
+        if (terrain != null && terrainCollider != null)
+        {
+            absorptionHeightModifier /= terrain.terrainData.heightmapScale.y;
         }
 
         GenerateInitialParticles();
@@ -193,6 +200,12 @@ public class VerletParticleSystem : MonoBehaviour
         {
             mesh.vertices = position;
         }
+
+        // Update terrain
+        if (terrain != null && terrainModified)
+        {
+            terrain.ApplyDelayedHeightmapModification();
+        }
     }
 
     private void ParticleUpdate (int particle, float tSquared)
@@ -235,11 +248,12 @@ public class VerletParticleSystem : MonoBehaviour
             Vector3 rayOrigin = currentPosition + transform.position + (distanceTraveled * nextVelocity);
             if (!terrainCollider.Raycast(new Ray(rayOrigin, nextVelocity), out hitInfo, (nextVelocity.magnitude - distanceTraveled)))
             {
-                Debug.LogError("VerletParticleSystem.ParticleUpdate: Below height, but no collision with particle " + particle); // + " - prior diff = " + priorHeightDiff + " - next diff = " + nextHeightDiff);
+                //Debug.LogError("VerletParticleSystem.ParticleUpdate: Below height, but no collision with particle " + particle); // + " - prior diff = " + priorHeightDiff + " - next diff = " + nextHeightDiff);
+                //AbsorbParticle(particle, rayOrigin);
                 timeToLive[particle] = 0;
+
                 return false;
             }
-            Debug.Log(" + collision " + particle + ", " + cont + " | tempHitPoint = " + hitInfo.point.ToFullString() + " | dist = " + hitInfo.distance + " | mag of vec = " + remainingDistance + " | perc = " + (tempHitInfo.distance / remainingDistance));
 
             // Collision Response
             if (nextVelocity.magnitude > absorptionVelocity) // TODO Convert to using sqrmagnitude
@@ -269,25 +283,30 @@ public class VerletParticleSystem : MonoBehaviour
                 priorPosition[particle] = newCurrentPosition;
                 position[particle] = newNextPosition;
 
-                //if (cont > 0)
-                //    ParticleCollisionUpdate(particle, newNextVelocity, newDistanceTraveled, newCurrentPosition, newNextPosition, cont - 1);
+                if (cont > 0)
+                    ParticleCollisionUpdate(particle, newNextVelocity, newDistanceTraveled, newCurrentPosition, newNextPosition, cont - 1);
 
-                RaycastHit tempHitInfo;
-                Vector3 newNextWorldPosition = newNextPosition + transform.position;
-                if (IsBelowTerrain(newNextWorldPosition))
-                {
-                    if (terrainCollider.Raycast(new Ray(hitInfo.point + (kRaycastOffset * newNextVelocity), newNextVelocity), out tempHitInfo, remainingDistance))
-                    {
-                        float hitDistance = tempHitInfo.distance + (kRaycastOffset * newMagnitude);
-                        Debug.Log(" + collision " + particle + ", " + cont + " | hitPoint = " + hitInfo.point.ToFullString() + " tempHitPoint = " + tempHitInfo.point.ToFullString() + " equal = " + (hitInfo.point == tempHitInfo.point) + " | dist = " + tempHitInfo.distance + " | true dist = " + hitDistance + " | mag of vec = " + remainingDistance + " | perc = " + (tempHitInfo.distance / remainingDistance));
-                        if (cont > 0)
-                            Debug.Log(" - collision " + particle + ", " + cont + " | - " + ParticleCollisionUpdate(particle, newNextVelocity, newDistanceTraveled, newCurrentPosition, newNextPosition, cont - 1));
-                    }
-                    else
-                    {
-                        Debug.Log(" x collision : " + particle + ", " + cont + " | below terrain, raycast failed ");
-                    }
-                }
+                //RaycastHit tempHitInfo;
+                //Vector3 newNextWorldPosition = newNextPosition + transform.position;
+                //if (IsBelowTerrain(newNextWorldPosition))
+                //{
+                //    if (terrainCollider.Raycast(new Ray(hitInfo.point + (kRaycastOffset * newNextVelocity), newNextVelocity), out tempHitInfo, remainingDistance))
+                //    {
+                //        float hitDistance = tempHitInfo.distance + (kRaycastOffset * newMagnitude);
+                //        Debug.Log(" + collision " + particle + ", " + cont + " | hitPoint = " + hitInfo.point.ToFullString() + " tempHitPoint = " + tempHitInfo.point.ToFullString() + " equal = " + (hitInfo.point == tempHitInfo.point) + " | dist = " + tempHitInfo.distance + " | true dist = " + hitDistance + " | mag of vec = " + remainingDistance + " | perc = " + (tempHitInfo.distance / remainingDistance));
+                //        if (cont > 0)
+                //            Debug.Log(" - collision " + particle + ", " + cont + " | - " + ParticleCollisionUpdate(particle, newNextVelocity, newDistanceTraveled, newCurrentPosition, newNextPosition, cont - 1));
+                //    }
+                //    else
+                //    {
+                //        Debug.Log(" x collision : " + particle + ", " + cont + " | below terrain, raycast failed ");
+                //    }
+                //}
+            }
+            else
+            {
+                AbsorbParticle(particle, hitInfo.point);
+                Debug.Log("Absorbing from low velocity: " + nextVelocity.magnitude);
             }
 
             return true;
@@ -296,157 +315,82 @@ public class VerletParticleSystem : MonoBehaviour
         return false;
     }
 
+    private void AbsorbParticle (int particle, Vector3 collisionPoint)
+    {
+        // Calculate new heights for each index based on barycentric coords
+        // Apply heights to terrain
 
-    //private bool ParticleCollisionUpdate(int particle, Vector3 nextVelocity, float remainingDistance, Vector3 rayOrigin, Vector3 currentPosition, Vector3 nextPosition, int cont)
-    //{
-    //    // If particle height below mesh height, find collision point
-    //    Vector3 nextWorldPosition = nextPosition + transform.position;
-    //    if (IsBelowTerrain(nextWorldPosition))
-    //    {
-    //        //Debug.Log("Collision for " + particle);
-    //        // Find collision point
-    //        RaycastHit hitInfo;
-    //        //Vector3 rayOrigin = currentPosition + transform.position + (distanceTraveled * nextVelocity);
-    //        if (!terrainCollider.Raycast(new Ray(rayOrigin, nextVelocity), out hitInfo, (nextVelocity.magnitude - remainingDistance)))
-    //        {
-    //            //Vector3 currentWorldPosition = currentPosition + transform.position;
-    //            //Vector2 priorTerrainPosition = GetNormalizedPositionOnTerrain(currentWorldPosition);
-    //            //float priorheight = terrain.terrainData.GetInterpolatedHeight(priorTerrainPosition.x, priorTerrainPosition.y);
-    //            //float priorHeightDiff = currentWorldPosition.y - priorheight;
+        // Place collisionPoint on terrain
+        collisionPoint = new Vector3(collisionPoint.x, terrain.SampleHeight(collisionPoint), collisionPoint.z);
 
-    //            //Vector2 nextTerrainPosition = GetNormalizedPositionOnTerrain(nextWorldPosition);
-    //            //float nextheight = terrain.terrainData.GetInterpolatedHeight(nextTerrainPosition.x, nextTerrainPosition.y);
-    //            //float nextHeightDiff = nextWorldPosition.y - nextheight;
+        // Calculate Barycentric Coordinates
+        Vector2 terrainIndex = GetIndexPositionOnTerrain(collisionPoint);
+        int boundTerrainIndexX = (int)terrainIndex.x;
+        int boundTerrainIndexY = (int)terrainIndex.y;
 
-    //            Debug.LogError("VerletParticleSystem.ParticleUpdate: Below height, but no collision with particle " + particle); // + " - prior diff = " + priorHeightDiff + " - next diff = " + nextHeightDiff);
+        // Get heights 
+        // TODO Fix this to modify the heights available
+        float[,] heights;
+        try
+        {
+            heights = terrain.terrainData.GetHeights(boundTerrainIndexX, boundTerrainIndexY, 2, 2);
+        }
+        catch (ArgumentException e)
+        {
+            // Out of bounds from the heightmap
+            timeToLive[particle] = 0;
+            return;
+        }
 
-    //            timeToLive[particle] = 0;
-    //            return false;
-    //        }
-    //        else
-    //        {
-    //            Vector2 nextTerrainPosition = GetNormalizedPositionOnTerrain(hitInfo.point);
-    //            float height = terrain.terrainData.GetInterpolatedHeight(nextTerrainPosition.x, nextTerrainPosition.y);
-    //            float heightDiff = hitInfo.point.y - height;
-    //            if (!IsBelowTerrain(hitInfo.point))
-    //                Debug.LogWarning(particle + " NOT BELOW AT HITPOINT: height-diff: " + heightDiff);
-    //        }
+        // Check if u < v
+        bool topTriangle = (terrainIndex.x - boundTerrainIndexX) < (terrainIndex.y - boundTerrainIndexY);
 
-    //        //Vector2 normalizedCollisionPoint = GetNormalizedPositionOnTerrain(hitInfo.point);
-    //        //Vector3 interpolatedNormal = terrain.terrainData.GetInterpolatedNormal(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
-    //        //float interpolatedHeight = terrain.terrainData.GetInterpolatedHeight(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
-    //        //Debug.Log(interpolatedNormal.x + ", " + interpolatedNormal.y + ", " + interpolatedNormal.z + " VS " + hitInfo.normal.x + ", " + hitInfo.normal.y + ", " + hitInfo.normal.z);
+        // Get indices in the array of heights
+        Vector2 aIndices, bIndices, cIndices;
+        GetTerrainIndices(topTriangle, out aIndices, out bIndices, out cIndices);
 
-    //        // Calculate velocity (taking in account distance traveled so far)
-    //        //Vector3 displacement = hitInfo.point - currentWorldPosition;
-    //        //Vector3 remainingDisplacement = nextWorldPosition - hitInfo.point;
+        // Get points of colliding triangle
+        Vector3 a, b, c;
+        GetTrianglePoint(heights, boundTerrainIndexX, boundTerrainIndexY, aIndices, out a);
+        GetTrianglePoint(heights, boundTerrainIndexX, boundTerrainIndexY, bIndices, out b);
+        GetTrianglePoint(heights, boundTerrainIndexX, boundTerrainIndexY, cIndices, out c);
 
-    //        // Collision Response
-    //        if (nextVelocity.magnitude > absorptionVelocity) // TODO Convert to using sqrmagnitude
-    //        {
-    //            //Debug.Log("Bounce: " + nextVelocity.magnitude);
-    //            // bounce
+        // TODO Fix the barrycentric misses
+        Vector3 barycentricCoords = GetBarycentricCoords(collisionPoint, a, b, c);
+        if (barycentricCoords.x < 0 || barycentricCoords.y < 0 || barycentricCoords.z < 0)
+        {
+            Debug.LogError("VerletParticleSystem.ParticleUpdate: Invalid collision with particle " + particle + " at " + collisionPoint + " | Barrycentric Coordinates: " + barycentricCoords);
+        }
+        else
+        {
+            float apppliedMass = particleMass * absorptionHeightModifier;
+            UpdateTriangleHeight(ref heights, aIndices, barycentricCoords.x, apppliedMass);
+            UpdateTriangleHeight(ref heights, bIndices, barycentricCoords.y, apppliedMass);
+            UpdateTriangleHeight(ref heights, cIndices, barycentricCoords.z, apppliedMass);
 
-    //            Vector3 normal;
-    //            if (useInterpolatedNormal)
-    //            {
-    //                Vector2 normalizedCollisionPoint = GetNormalizedPositionOnTerrain(hitInfo.point);
-    //                normal = terrain.terrainData.GetInterpolatedNormal(normalizedCollisionPoint.x, normalizedCollisionPoint.y);
-    //            }
-    //            else
-    //            {
-    //                normal = hitInfo.normal;
-    //            }
+            //Debug.Log(barycentricCoords);
+            //Debug.Log(hitInfo.point - ((a * barycentricCoords.x) + (b * barycentricCoords.y) + (c * barycentricCoords.z)));
+            //Debug.Log("Colliding at " + hitInfo.point + " between - " + currentWorldPosition + ", " + nextWorldPosition + " | n = " + normal + ", h = " + collisionHeight);
+            //Debug.Log("On Triangle " + a + " - " + b + " - " + c);
 
-    //            // Calculate new trajectory using normal reflection
-    //            Vector3 nextVelocityNormal = Vector3.Dot(normal, nextVelocity) * normal;
-    //            Vector3 newNextVelocity = nextVelocity - ((1 + terrainRestitution) * nextVelocityNormal);
-    //            float newMagnitude = newNextVelocity.magnitude; // TODO if moving block to in raycast if, use cached version
-    //            //Debug.Log("NextVelocity = " + nextVelocity + ", NewNextVelocity = " + newNextVelocity);
-    //            //Debug.Log(currentPosition + " : " + hitInfo.point);
+            terrain.terrainData.SetHeightsDelayLOD(boundTerrainIndexX, boundTerrainIndexY, heights);
 
-    //            float newDistanceTraveled = (hitInfo.distance / nextVelocity.magnitude);
-    //            float newRemainingDistance = (1 - newDistanceTraveled) * newMagnitude;
+            if (!terrainModified)
+                terrainModified = true;
+        }
 
-    //            // Calculate new position, and modify priorPosition as needed
-    //            Vector3 newCurrentPosition = (hitInfo.point - transform.position) - (newDistanceTraveled * newNextVelocity);
-    //            Vector3 newNextPosition = newCurrentPosition + newNextVelocity;
-    //            priorPosition[particle] = newCurrentPosition;
-    //            position[particle] = newNextPosition;
+        timeToLive[particle] = 0;
+    }
 
-    //            RaycastHit tempHitInfo;
-    //            Vector3 newNextWorldPosition = newNextPosition + transform.position;
-    //            //if (terrainCollider.Raycast(new Ray(newNextWorldPosition, (-1 * newNextVelocity)), out tempHitInfo, remainingDistance))
-    //            if (IsBelowTerrain(newNextWorldPosition))
-    //            {
-    //                Debug.Log("Below terrain: " + particle);
-    //                if (terrainCollider.Raycast(new Ray(hitInfo.point + (kRaycastOffset * newNextVelocity), newNextVelocity), out tempHitInfo, newRemainingDistance))
-    //                {
-    //                    float hitDistance = tempHitInfo.distance + (kRaycastOffset * newMagnitude);
-    //                    //if (IsBelowTerrain(newNextWorldPosition))
-    //                    //{
-    //                    Debug.Log("Continued Collision for " + particle + " hitPoint = " + hitInfo.point.ToFullString() + " tempHitPoint = " + tempHitInfo.point.ToFullString() + " equal = " + (hitInfo.point == tempHitInfo.point) + " | dist = " + tempHitInfo.distance + " | true dist = " + hitDistance + " | mag of vec = " + newRemainingDistance + " | perc = " + (tempHitInfo.distance / newRemainingDistance));
-    //                    if (cont > 0)
-    //                        ParticleCollisionUpdate(particle, newNextVelocity, newRemainingDistance, (hitInfo.point + (kRaycastOffset * newNextVelocity)), newCurrentPosition, newNextPosition, cont - 1);
-    //                }
-    //            }
-
-    //            //terrainCollider.Raycast(new Ray(currentPosition, newNextVelocity), out tempHitInfo, newNextVelocity.magnitude);
-    //            //Debug.Log("Continued " + particle + " tempHitPoint2 = " + tempHitInfo.point.ToFullString());
-
-
-    //            //Vector3 newNextWorldPosition = nextPosition + transform.position;
-    //            //if (IsBelowTerrain(newNextWorldPosition))
-    //            //{
-    //            //    Vector2 nextTerrainPosition = GetNormalizedPositionOnTerrain(newNextWorldPosition);
-    //            //    float height = terrain.terrainData.GetInterpolatedHeight(nextTerrainPosition.x, nextTerrainPosition.y);
-    //            //    Debug.Log("New Velocity TOO LOW particle " + particle + ", Old vel = (" + nextVelocity.x + ", " + nextVelocity.y + ", " + nextVelocity.z + ") | New vel = (" + newNextVelocity.x + ", " + newNextVelocity.y + ", " + newNextVelocity.z + ") || height = " + newNextWorldPosition.y + " | interp height = " + height + " | diff = " + (newNextWorldPosition.y - height));
-
-    //            //    RaycastHit hitInfoTemp;
-    //            //    bool collided = terrainCollider.Raycast(new Ray(currentPosition + transform.position, newNextVelocity), out hitInfoTemp, newNextVelocity.magnitude);
-    //            //    Debug.Log("Collision with new velocity = " + collided + " | if so new hit = (" + hitInfoTemp.point.x + ", " + hitInfoTemp.point.y + ", " + hitInfoTemp.point.z + ") | old hit = (" + hitInfo.point.x + ", " + hitInfo.point.y + ", " + hitInfo.point.z + ") | == " + (hitInfo.point == hitInfoTemp.point));
-    //            //}
-    //        }
-    //        //else
-    //        //{
-    //        //    Debug.Log("Absorbed: " + nextVelocity.magnitude);
-    //        //    // absorbed
-    //        //    // Calculate new heights for each index based on barycentric coords
-    //        //    // Apply heights to terrain
-
-    //        //    // Calculate Barycentric Coordinates
-    //        //    Vector2 terrainIndex = GetIndexPositionOnTerrain(hitInfo.point);
-    //        //    Vector2 terrainIndexBound = new Vector2((int)terrainIndex.x, (int)terrainIndex.y);
-    //        //    Vector2 uv = terrainIndex - terrainIndexBound;
-
-    //        //    // Points of colliding triangle
-    //        //    Vector3 a, b, c;
-    //        //    FillPoints(terrainIndexBound, uv[0] < uv[1], out a, out b, out c);
-
-    //        //    Vector3 barycentricCoords = GetBarycentricCoords(hitInfo.point, a, b, c);
-    //        //    if (barycentricCoords.x < 0 || barycentricCoords.y < 0 || barycentricCoords.z < 0)
-    //        //    {
-    //        //        Debug.Log("VerletParticleSystem.ParticleUpdate: Invalid collision with particle " + particle + " at " + hitInfo.point + ", Barrycentric Coordinates: " + barycentricCoords);
-    //        //    }
-
-    //        //    //Debug.Log(barycentricCoords);
-    //        //    //Debug.Log(hitInfo.point - ((a * barycentricCoords.x) + (b * barycentricCoords.y) + (c * barycentricCoords.z)));
-    //        //    //Debug.Log("Colliding at " + hitInfo.point + " between - " + currentWorldPosition + ", " + nextWorldPosition + " | n = " + normal + ", h = " + collisionHeight);
-    //        //    //Debug.Log("On Triangle " + a + " - " + b + " - " + c);
-
-    //        //    timeToLive[particle] = 0;
-    //        //}
-
-    //        return true;
-    //    }
-
-    //    return false;
-    //}
+    private void UpdateTriangleHeight(ref float[,] heights, Vector2 indices, float modifier, float appliedMass)
+    {
+        heights[(int)indices.x, (int)indices.y] += appliedMass * modifier;
+    }
 
     private bool IsBelowTerrain (Vector3 worldPosition)
     {
         Vector2 nextTerrainPosition = GetNormalizedPositionOnTerrain(worldPosition);
-        float height = terrain.terrainData.GetInterpolatedHeight(nextTerrainPosition.x, nextTerrainPosition.y);
+        float height = terrain.terrainData.GetInterpolatedHeight(nextTerrainPosition.x, nextTerrainPosition.y); // Could use terrain.SampleHeight() instead
         float heightDiff = worldPosition.y - height;
 
         return heightDiff <= kCollisionError;
@@ -473,28 +417,25 @@ public class VerletParticleSystem : MonoBehaviour
     }
 
     // Terrain functions
-
-    private void FillPoints (Vector2 nextTerrainIndexBound, bool topTriangle, out Vector3 a, out Vector3 b, out Vector3 c)
+    private void GetTrianglePoint (float[,] heights, int boundTerrainIndexX, int boundTerrainIndexY, Vector2 indices, out Vector3 p)
     {
-        float[,] heights = terrain.terrainData.GetHeights((int)nextTerrainIndexBound.x, (int)nextTerrainIndexBound.y, 2, 2);
+        p = new Vector3((boundTerrainIndexX + indices.x) * terrain.terrainData.heightmapScale.x, heights[(int)indices.x, (int)indices.y] * terrain.terrainData.heightmapScale.y, (boundTerrainIndexY + indices.y) * terrain.terrainData.heightmapScale.z);
+    }
 
-        Vector2 aIndex, bIndex, cIndex;
+    private void GetTerrainIndices (bool topTriangle, out Vector2 aIndices, out Vector2 bIndices, out Vector2 cIndices)
+    {
         if (!topTriangle)
         {
-            aIndex = new Vector2(1, 1); // z11
-            bIndex = new Vector2(0, 0); // z00
-            cIndex = new Vector2(1, 0); // z10
+            aIndices = new Vector2(1, 1); // z11
+            bIndices = new Vector2(0, 0); // z00
+            cIndices = new Vector2(1, 0); // z10
         }
         else
         {
-            aIndex = new Vector2(1, 1); // z11
-            bIndex = new Vector2(0, 1); // z01
-            cIndex = new Vector2(0, 0); // z00
+            aIndices = new Vector2(1, 1); // z11
+            bIndices = new Vector2(0, 1); // z01
+            cIndices = new Vector2(0, 0); // z00
         }
-
-        a = new Vector3((nextTerrainIndexBound[0] + aIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)aIndex[0], (int)aIndex[1]] * terrain.terrainData.heightmapScale[1], (nextTerrainIndexBound[1] + aIndex[1]) * terrain.terrainData.heightmapScale[2]);
-        b = new Vector3((nextTerrainIndexBound[0] + bIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)bIndex[0], (int)bIndex[1]] * terrain.terrainData.heightmapScale[1], (nextTerrainIndexBound[1] + bIndex[1]) * terrain.terrainData.heightmapScale[2]);
-        c = new Vector3((nextTerrainIndexBound[0] + cIndex[0]) * terrain.terrainData.heightmapScale[0], heights[(int)cIndex[0], (int)cIndex[1]] * terrain.terrainData.heightmapScale[1], (nextTerrainIndexBound[1] + cIndex[1]) * terrain.terrainData.heightmapScale[2]);
     }
 
     private float GetHeight (Vector2 xy)
