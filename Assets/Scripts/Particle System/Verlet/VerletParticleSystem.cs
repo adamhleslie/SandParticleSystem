@@ -72,13 +72,16 @@ public class VerletParticleSystem : MonoBehaviour
         GenerateInitialParticles();
     }
 
-    void FixedUpdate ()
+    void Update()
     {
-        if (Input.GetButton("Fire1"))
+        if (Input.GetButtonDown("Fire1"))
         {
             paused = !paused;
         }
+    }
 
+    void FixedUpdate ()
+    {
         if (!paused)
         {
             UpdateParticles(Time.fixedDeltaTime);
@@ -382,7 +385,7 @@ public class VerletParticleSystem : MonoBehaviour
         timeToLive[particle] = 0;
     }
 
-    private void UpdateTriangleHeight(ref float[,] heights, Vector2 indices, float modifier, float appliedMass)
+    private void UpdateTriangleHeight (ref float[,] heights, Vector2 indices, float modifier, float appliedMass)
     {
         heights[(int)indices.x, (int)indices.y] += appliedMass * modifier;
     }

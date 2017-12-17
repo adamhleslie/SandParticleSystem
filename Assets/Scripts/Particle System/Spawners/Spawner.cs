@@ -39,7 +39,7 @@ public abstract class Spawner : MonoBehaviour
         return particles;
     }
 
-    public SimpleParticle[] GenerateInitialParticles()
+    public SimpleParticle[] GenerateInitialParticles ()
     {
         return GenerateParticles(initialParticles);
     }
